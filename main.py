@@ -20,3 +20,6 @@ Image_2 = cv2.resize(Image_2,(y,x))
 
 Image_1 = lab_contrast(Image_1)
 Image_2 = lab_contrast(Image_2)
+
+print(np.shape(Image_1),args.op)
+cv2.imwrite(args.op,Image_1)
