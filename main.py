@@ -21,5 +21,12 @@ Image_2 = cv2.resize(Image_2,(y,x))
 Image_1 = lab_contrast(Image_1)
 Image_2 = lab_contrast(Image_2)
 
+body_1, i_b1 = detect_body(Image_1.copy())
+body_2, i_b2 = detect_body(Image_2.copy())
+
+if (len(body_1) == 0 or len(body_2) == 0):
+    print("Face not detected in one/both Images")
+    sys.exit()
+
 print(np.shape(Image_1),args.op)
 cv2.imwrite(args.op,Image_1)
