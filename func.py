@@ -14,7 +14,7 @@ def lab_contrast(img, grid_size=7):
 def detect_body(img):
     var = 1.5
     iter=0
-    face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+    face_cascade = cv2.CascadeClassifier('lib/haarcascade_frontalface_default.xml')
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(gray, var, 5)
     while(len(faces)==0):
@@ -25,9 +25,15 @@ def detect_body(img):
             break
     dist=0
     for (x,y,w,h) in faces:
-        x1 = int(x-int(w))
+        x1 = int(x-int(1.5*w))
+        if x1<0:
+            x1=0
         y1 = int(y-h)
-        x2 = x+int(w)
+        if y1<0:
+            y1=0
+        x2 = x+int(2.2*w)
+        if x2>img.shape[1]:
+            x2=img.shape[1]
         y2 = img.shape[0]
         area = ((x2-x1) * (y2-y1))
         if dist < area:
