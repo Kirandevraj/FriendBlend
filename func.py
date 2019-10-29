@@ -55,3 +55,9 @@ def valid_keypoints(body1,body2,keypoints):
 		else:
 			op_keypoints.remove(keypoints[i])
 	return op_keypoints
+
+
+def keypoints_orb_descriptor(img, kp, n=1000):
+	orb = cv.ORB_create(nfeatures=n)
+	kp, des = orb.compute(img, kp)
+	return kp, des
