@@ -14,7 +14,7 @@ def lab_contrast(img, grid_size=7):
 def detect_body(img):
     var = 1.5
     iter=0
-    face_cascade = cv2.CascadeClassifier('lib/haarcascade_frontalface_default.xml')
+    face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(gray, var, 5)
     while(len(faces)==0):
@@ -58,6 +58,15 @@ def valid_keypoints(body1,body2,keypoints):
 
 
 def keypoints_orb_descriptor(img, kp, n=1000):
-	orb = cv.ORB_create(nfeatures=n)
+	orb = cv2.ORB_create(nfeatures=n)
 	kp, des = orb.compute(img, kp)
 	return kp, des
+
+def keypoint_bf_matcher(des1, des2, n=40):
+	bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+	matches = bf.match(des1,des2)
+	matches = sorted(matches, key = lambda x:x.distance)
+	min_dist = matches[0].distance	
+	if (len(matches) < 500):
+		n = 20
+	return matches[0:n]
