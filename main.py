@@ -34,5 +34,7 @@ keypoints_valid_2 = valid_keypoints(body_1,body_2,keypoints_2)
 _, descriptor1  = keypoints_orb_descriptor(Image_1,keypoints_valid_1, n_keypoints)
 _, descriptor2  = keypoints_orb_descriptor(Image_2,keypoints_valid_2, n_keypoints)
 
+keypoint_matches = keypoint_bf_matcher(descriptor1, descriptor2)
+
 print(np.shape(Image_1),args.op)
 cv2.imwrite(args.op,Image_1)
