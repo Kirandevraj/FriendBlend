@@ -70,3 +70,16 @@ def keypoint_bf_matcher(des1, des2, n=40):
 	if (len(matches) < 500):
 		n = 20
 	return matches[0:n]
+
+def extract_matched_points(dmatches, kpts1, kpts2):
+    src_pts  = np.float32([kpts1[m.queryIdx].pt for m in dmatches]).reshape(-1,1,2)
+    dst_pts  = np.float32([kpts2[m.trainIdx].pt for m in dmatches]).reshape(-1,1,2)
+    return src_pts, dst_pts
+
+def calculate_homography_matrix(pts_src, pts_dst):
+    h, status = cv2.findHomography(pts_src, pts_dst)
+    return h
+
+def warp_perspective(img_src, h):
+    im_out = cv2.warpPerspective(img_src, h, (img_src.shape[1],img_src.shape[0]))
+    return im_out
