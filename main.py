@@ -36,11 +36,15 @@ _, descriptor2  = keypoints_orb_descriptor(Image_2,keypoints_valid_2, n_keypoint
 
 keypoint_matches = keypoint_bf_matcher(descriptor1, descriptor2)
 
-print(np.shape(Image_1),args.op)
-cv2.imwrite(args.op,Image_1)
-doesnhomography_matrix = calculate_homography_matrix(source_points, destination_points)
+homography_matrix = calculate_homography_matrix(source_points, destination_points)
 
 homography_warped_1 = warp_perspective(Image_1.copy(), homography_matrix)
 
 top_left_x1,top_left_y1,bot_right_x1,bot_right_y1,w,h=body_1[0]
 pt1 = np.float32([[[top_left_x1, top_left_y1]],[[bot_right_x1, top_left_y1]],[[top_left_x1, bot_right_y1]] ,[[bot_right_x1,bot_right_y1]]])
+
+new_points = transform_points(pt1, homography_matrix)
+new_points[new_points<0] = 0
+new_points= new_points.astype(int)
+a,b = new_points[0]
+c,d = new_points[-1]
