@@ -83,3 +83,9 @@ def calculate_homography_matrix(pts_src, pts_dst):
 def warp_perspective(img_src, h):
     im_out = cv2.warpPerspective(img_src, h, (img_src.shape[1],img_src.shape[0]))
     return im_out
+
+def transform_points(pt1, homography_matrix):
+    new_points = cv2.perspectiveTransform(pt1, homography_matrix)
+    new_points[new_points <0] = 0
+    new_points = new_points.reshape((new_points.shape[0], new_points.shape[2]))
+    return new_points
