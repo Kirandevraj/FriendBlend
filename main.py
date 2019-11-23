@@ -1,4 +1,4 @@
-import cv2
+import cv2 as cv
 import sys
 import argparse
 from func import *
@@ -28,6 +28,16 @@ if (len(body_1) == 0 or len(body_2) == 0):
     print("Face not detected in one/both Images")
     sys.exit()
 
+Image_1,Image_2,body_1,body_2 = sort_order(Image_1,Image_2,body_1,body_2)
+
+
+keypoints_1 = keypoints_orb_detector(Image_1,n_keypoints)
+keypoints_2 = keypoints_orb_detector(Image_2,n_keypoints)
+
+if (len(body_1) == 0 or len(body_2) == 0):
+    print("Exitting the process as **Face not detected in one/both Images**")
+    sys.exit()
+
 keypoints_valid_1 = valid_keypoints(body_1,body_2,keypoints_1)
 keypoints_valid_2 = valid_keypoints(body_1,body_2,keypoints_2)
 
@@ -35,6 +45,8 @@ _, descriptor1  = keypoints_orb_descriptor(Image_1,keypoints_valid_1, n_keypoint
 _, descriptor2  = keypoints_orb_descriptor(Image_2,keypoints_valid_2, n_keypoints)
 
 keypoint_matches = keypoint_bf_matcher(descriptor1, descriptor2)
+
+source_points, destination_points = extract_matched_points(keypoint_matches, keypoints_valid_1, keypoints_valid_2)
 
 homography_matrix = calculate_homography_matrix(source_points, destination_points)
 
