@@ -8,4 +8,4 @@
 * For additional details, kindly refer to DIP_Proposal_Team_FB.pdf
 
 # Procedure to run the code:
-* python main.py --inp1 path_to_file1 --inp2 path_to_file2 --op path_to_output
+* python main.py --inp1  *path_to_file1*  --inp2  *path_to_file2*  --op  *path_to_output*
