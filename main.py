@@ -1,90 +1,88 @@
-import cv2 as cv
+import cv2
 import sys
 import argparse
 from func import *
 
-
 parser = argparse.ArgumentParser()
-parser.add_argument("--inp1", help="Path to input image 1")
-parser.add_argument("--inp2", help="Path to input image 2")
-parser.add_argument("--op", help="Path for the result to be stored", default="Results/op.jpg")
-parser.add_argument("--technique", help="Which blending technique to use", default="auto", choices=["auto", "grabcut", "alphablend"])
+parser.add_argument("--img1", help="Path for img1")
+parser.add_argument("--img2", help="Path for img2")
+parser.add_argument("--method", help="Blending method", default="automatic", choices=["automatic", "grabcut", "alphablend"])
+parser.add_argument("--out", help="Path for result", default="Results/out.jpg")
 args = parser.parse_args()
 
-n_keypoints = 10000
-Image_1 = cv2.imread(args.inp1)
-Image_2 = cv2.imread(args.inp2)
+num_kp = 1000
+img1, img2 = cv2.imread(args.img1), cv2.imread(args.img2) 
+img2 = cv2.resize(img2,(img1.shape[1],img1.shape[0]))
 
-x,y,_ = Image_1.shape
-Image_2 = cv2.resize(Image_2,(y,x))
+#  contrast  limited  histogram  equalization  in  the  Lab color space on the lightness channel to preserve hue
+img1, img2 = clahe(img1), clahe(img2)
 
-Image_1 = lab_contrast(Image_1)
-Image_2 = lab_contrast(Image_2)
+# return bounding box for face and body of subject
+bbox_1, img_bbox_1 = haar_body_detector(img1.copy())
+if len(bbox_1) == 0:
+	raise Exception("Face not detected in first input image")
+	sys.exit()
+bbox_2, img_bbox_2 = haar_body_detector(img2.copy())
+if len(bbox_1) == 0:
+	raise Exception("Face not detected in second input image")
+	sys.exit()
 
-body_1, i_b1 = detect_body(Image_1.copy())
-body_2, i_b2 = detect_body(Image_2.copy())
+# order images
+img1,img2,bbox_1,bbox_2 = ordering_img(img1,img2,bbox_1,bbox_2)
 
-if (len(body_1) == 0 or len(body_2) == 0):
-    print("Face not detected in one/both Images")
-    sys.exit()
+# determine mapping between the 2 input images
+kp_1, kp_2 = kp_orb_detection(img1,num_kp), kp_orb_detection(img2,num_kp)
 
-Image_1,Image_2,body_1,body_2 = sort_order(Image_1,Image_2,body_1,body_2)
+# find valid keypoints in an image i.e not present on the bounding boxes
+kp1_viable, kp2_viable = viable_kp(bbox_1,bbox_2,kp_1), viable_kp(bbox_1,bbox_2,kp_2)
 
+# compute descriptors using orb
+desc_1  = kp_orb_descriptor(img1,kp1_viable, num_kp) 
+desc_2 = kp_orb_descriptor(img2,kp2_viable, num_kp)
 
-keypoints_1 = keypoints_orb_detector(Image_1,n_keypoints)
-keypoints_2 = keypoints_orb_detector(Image_2,n_keypoints)
+# brute force matching using hamming distance as the measure
+kp_bf_match = kp_bf(desc_1, desc_2)
 
-if (len(body_1) == 0 or len(body_2) == 0):
-    print("Exitting the process as **Face not detected in one/both Images**")
-    sys.exit()
+# extract the brute force matches
+src_pts, dest_pts = extract_bf_matches(kp_bf_match, kp1_viable, kp2_viable)
 
-keypoints_valid_1 = valid_keypoints(body_1,body_2,keypoints_1)
-keypoints_valid_2 = valid_keypoints(body_1,body_2,keypoints_2)
+# find the transform between matched keypoints
+hgraph_mat, status = cv2.findHomography(src_pts, dest_pts)
 
-_, descriptor1  = keypoints_orb_descriptor(Image_1,keypoints_valid_1, n_keypoints)
-_, descriptor2  = keypoints_orb_descriptor(Image_2,keypoints_valid_2, n_keypoints)
+# change the apparent perspective of an image using geometric transformation
+img_src = img1.copy()
+warp_img = cv2.warpPerspective(img_src, hgraph_mat, (img_src.shape[1],img_src.shape[0]))
 
-keypoint_matches = keypoint_bf_matcher(descriptor1, descriptor2)
+# tl_x1,tl_y1,br_x1,br_y1
+orig_pt = np.float32([[[bbox_1[0][0], bbox_1[0][1]]],[[bbox_1[0][2], bbox_1[0][1]]],[[bbox_1[0][0], bbox_1[0][3]]] ,[[bbox_1[0][2],bbox_1[0][3]]]])
 
-source_points, destination_points = extract_matched_points(keypoint_matches, keypoints_valid_1, keypoints_valid_2)
+# compute the perspective transform pertr_pts
+pertr_pts = cv2.perspectiveTransform(orig_pt, hgraph_mat)
+pertr_pts[pertr_pts < 0] = 0
+pertr_pts = pertr_pts.reshape((pertr_pts.shape[0], pertr_pts.shape[2]))
+pertr_pts = pertr_pts.astype(int)
+p1,p2 = pertr_pts[0]
+p3,p4 = pertr_pts[-1]
+w, h = bbox_1[0][4], bbox_1[0][5]
 
-homography_matrix = calculate_homography_matrix(source_points, destination_points)
-
-homography_warped_1 = warp_perspective(Image_1.copy(), homography_matrix)
-
-top_left_x1,top_left_y1,bot_right_x1,bot_right_y1,w,h=body_1[0]
-pt1 = np.float32([[[top_left_x1, top_left_y1]],[[bot_right_x1, top_left_y1]],[[top_left_x1, bot_right_y1]] ,[[bot_right_x1,bot_right_y1]]])
-
-new_points = transform_points(pt1, homography_matrix)
-new_points[new_points<0] = 0
-new_points= new_points.astype(int)
-a,b = new_points[0]
-c,d = new_points[-1]
-
-if args.technique == "auto":
-	if blend_or_cut(body_1,body_2, 200)=="grabcut":
-		body_1_homographed = [(a,b,c,d,w,h)]
-		grab,bck = grabcut(homography_warped_1,Image_2,body_1_homographed,body_2)
-		op_image = blend_cropped_image(bck,grab)
-		op_image = crop_image(op_image, homography_matrix)
-		op_image = blur_img(op_image)
+# decide approach based on distance between the bounding boxes
+if args.method == "automatic":
+	if bbox_2[0][2]-bbox_1[0][2]<200:
+		args.method="grabcut"
 	else:
-		body_1_homographed = [(a,b,c,d)]
-		op_image = alpha_blend(homography_warped_1,Image_2,body_1_homographed,body_2)
-		op_image = crop_image(op_image, homography_matrix)
+		args.method="alphablend"
 
-elif args.technique=="grabcut":
-	print ("Implementing GrabCut")
-	body_1_homographed = [(a,b,c,d,w,h)]
-	grab,bck = grabcut(homography_warped_1,Image_2,body_1_homographed,body_2)
-	op_image = blend_cropped_image(bck,grab)
-	op_image = crop_image(op_image, homography_matrix)	
-	op_image = blur_img(op_image)
+# perform alphablend and grabcut
+if args.method=="alphablend":
+	print("Implementing Alpha Blending as bodies are far enough")
+	out_img = alpha_blending(warp_img,img2,[(p1,p2,p3,p4)],bbox_2)
+	out_img = crop_image(out_img, hgraph_mat)
+elif args.method=="grabcut":
+	print("Implementing GrabCut as bodies are close enough")
+	grabcut_img,bg = grabcut(warp_img,img2,[(p1,p2,p3,p4,w,h)],bbox_2)
+	out_img = blend_crop_img(bg,grabcut_img)
+	out_img = crop_image(out_img, hgraph_mat)	
+	# Where nothing works, gaussian filter does :)
+	out_img = cv2.GaussianBlur(out_img,(3,3),0)
 
-elif args.technique=="alphablend":
-	print ("Implementing alpha blending")
-	body_1_homographed = [(a,b,c,d)]
-	op_image = alpha_blend(homography_warped_1,Image_2,body_1_homographed,body_2)
-	op_image = crop_image(op_image, homography_matrix)
-
-cv2.imwrite(args.op, op_image)
+cv2.imwrite(args.out, out_img)
